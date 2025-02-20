@@ -1,19 +1,21 @@
 {
-  "name": "aify",
+  "name": "Aify",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
     "@tailwindcss/vite": "^4.0.6",
+    "lucide-react": "^0.475.0",
     "openai": "^4.85.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwindcss": "^4.0.6",
-    "usehooks-ts": "^3.1.1"
+    "react-popper": "^2.3.0",
+    "tailwindcss": "^4.0.6"
   },
   "devDependencies": {
     "@types/react": "^18.0.26",

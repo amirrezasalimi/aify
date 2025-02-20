@@ -1,12 +1,19 @@
 import OpenAI from "openai";
 import browser from "webextension-polyfill";
-import { getStorageValue } from "./hooks/useLocalStorage";
+import { getStorageValue, setStorageValue } from "./hooks/useLocalStorage";
 
 const cache = new Map<string, string>();
 const MAX_CACHE_SIZE = 50;
 
-browser.runtime.onInstalled.addListener((details) => {
+browser.runtime.onInstalled.addListener(async (details) => {
   console.log("Extension installed:", details);
+  const styles = await getStorageValue("style", "");
+  if (!styles) {
+    await setStorageValue(
+      "style",
+      `Summarize: Summarize\nEli5: Eli5\nTo English: Translate to English`
+    );
+  }
 });
 
 browser.runtime.onMessage.addListener(async (message: any) => {
@@ -45,17 +52,10 @@ browser.runtime.onMessage.addListener(async (message: any) => {
     return cache.get(cacheKey);
   }
 
-  const prompt = `
-Summarize the following text while ensuring it meets the following criteria:
-
-1. **Length**: The summary should be ${summaryLengthName} in length.
-2. **Tone**: The summary should have a ${style} tone.
-3. **Content**: Ensure the summary is clear, concise, and captures the key points accurately.
-4. Do not include extra text or note.
-
-TEXT: ${text}
-
-Summary:
+  const prompt = `Please do ${summaryLengthName} on this text:
+${text}
+--------
+Response:
 `;
 
   try {

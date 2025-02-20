@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import browser from "webextension-polyfill";
 
-// Function to get the initial value from localStorage
 export async function getStorageValue<T>(
   key: string,
   defaultValue: T
@@ -16,6 +15,17 @@ export async function getStorageValue<T>(
       error
     );
     return defaultValue;
+  }
+}
+
+export async function setStorageValue<T>(key: string, value: T) {
+  try {
+    await browser.storage.local.set({ [key]: JSON.stringify(value) });
+  } catch (error) {
+    console.error(
+      `Error setting data to browser.storage.local for key "${key}":`,
+      error
+    );
   }
 }
 
