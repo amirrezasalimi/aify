@@ -1,13 +1,14 @@
 import OpenAI from "openai";
 import browser from "webextension-polyfill";
 import { getStorageValue, setStorageValue } from "./hooks/useLocalStorage";
+import { SETTINGS } from "./constants";
 
 const cache = new Map<string, string>();
 const MAX_CACHE_SIZE = 50;
 
 browser.runtime.onInstalled.addListener(async (details) => {
   console.log("Extension installed:", details);
-  const styles = await getStorageValue("style", "");
+  const styles = await getStorageValue(SETTINGS.STYLE, "");
   if (!styles) {
     await setStorageValue(
       "style",
@@ -23,10 +24,10 @@ browser.runtime.onMessage.addListener(async (message: any) => {
     summaryLengthName: string;
   };
 
-  const apiKey = await getStorageValue("apiKey", "");
-  const endpoint = await getStorageValue("endpoint", "");
-  const style = await getStorageValue("style", "");
-  const selectedModel = await getStorageValue("selectedModel", "");
+  const apiKey = await getStorageValue(SETTINGS.API_KEY, "");
+  const endpoint = await getStorageValue(SETTINGS.ENDPOINT, "");
+  const style = await getStorageValue(SETTINGS.STYLE, "");
+  const selectedModel = await getStorageValue(SETTINGS.SELECTED_MODEL, "");
 
   if (!text) {
     return;

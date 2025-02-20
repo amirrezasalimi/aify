@@ -1,7 +1,8 @@
+import { SETTINGS } from "../constants";
 import { getStorageValue } from "../hooks/useLocalStorage";
 
 export const getStyles = async () => {
-  const content = await getStorageValue("style", "");
+  const content = await getStorageValue(SETTINGS.STYLE, "");
   const items = content.split("\n");
 
   const stylesMap: { [key: string]: string } = {};
