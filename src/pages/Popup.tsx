@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 import OpenAI from "openai";
 import useLocalStorage from "../hooks/useLocalStorage";
