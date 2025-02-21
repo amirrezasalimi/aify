@@ -9,13 +9,13 @@
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
-    "@tailwindcss/vite": "^4.0.6",
+    "@tailwindcss/vite": "^4.0.8",
     "lucide-react": "^0.475.0",
     "openai": "^4.85.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-popper": "^2.3.0",
-    "tailwindcss": "^4.0.6"
+    "tailwindcss": "^4.0.8"
   },
   "devDependencies": {
     "@types/react": "^18.0.26",

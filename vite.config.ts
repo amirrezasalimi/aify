@@ -22,6 +22,7 @@ export default defineConfig({
     webExtension({
       manifest: generateManifest,
       disableAutoLaunch: true,
+      additionalInputs: ["src/content.css"],
     }),
   ],
 });

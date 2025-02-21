@@ -6,7 +6,7 @@ import { getStyles } from "./utils/styles";
 import { Shell, Copy, Check } from "lucide-react";
 import { getStorageValue, setStorageValue } from "./hooks/useLocalStorage";
 import { SETTINGS } from "./constants";
-import "../tailwind@4";
+import "./content.css";
 
 interface TextTransformerProps {
   onClose: () => void;
