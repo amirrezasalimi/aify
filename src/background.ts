@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import browser from "webextension-polyfill";
 import { getStorageValue, setStorageValue } from "./hooks/useLocalStorage";
 import { SETTINGS } from "./constants";
+import { getStyles } from "./utils/styles";
 
 const cache = new Map<string, string>();
 const MAX_CACHE_SIZE = 50;
@@ -53,9 +54,14 @@ browser.runtime.onMessage.addListener(async (message: any) => {
     return cache.get(cacheKey);
   }
 
-  const prompt = `Please do ${summaryLengthName} on this text:
+  const styles = await getStyles();
+  const stylePrompt = styles[summaryLengthName];
+  const prompt = `Please do ${stylePrompt} on the input text.
+<text>
 ${text}
+</text>
 --------
+- no extra text or note.
 Response:
 `;
 
@@ -72,7 +78,6 @@ Response:
     });
 
     const aiSummary = completion.choices[0].message.content;
-    console.log("AI Summary:\n", aiSummary);
     cache.set(cacheKey, aiSummary || "");
 
     if (cache.size > MAX_CACHE_SIZE) {
