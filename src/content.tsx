@@ -214,7 +214,7 @@ const TextTransformerApp: React.FC = () => {
       const selectedText = window.getSelection()?.toString() || "";
       const wordCount = selectedText.trim().split(/\s+/).length;
 
-      if (wordCount > minWords) {
+      if (wordCount >= minWords) {
         const selection = window.getSelection();
         if (!selection?.rangeCount) return;
 
