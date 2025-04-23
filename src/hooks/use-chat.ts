@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import useLocalStorage from "./use-localstorage";
-import { useOpenAI } from "./use-openai";
+import { getOpenAI } from "../utils/openai";
 import { getStorageValue } from "../utils/storage";
 import { SETTINGS } from "../constants";
 
@@ -69,7 +69,7 @@ export const useChat = () => {
     setError(null);
 
     try {
-      const openai = await useOpenAI();
+      const openai = await getOpenAI();
       const selectedModel = await getStorageValue(
         SETTINGS.SELECTED_MODEL,
         "gpt-3.5-turbo"
@@ -116,7 +116,7 @@ export const useChat = () => {
     setError(null);
 
     try {
-      const openai = await useOpenAI();
+      const openai = await getOpenAI();
       const selectedModel = await getStorageValue(
         SETTINGS.SELECTED_MODEL,
         "gpt-3.5-turbo"

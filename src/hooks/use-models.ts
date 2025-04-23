@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useOpenAI } from "./use-openai";
+import { getOpenAI } from "../utils/openai";
 
 interface UseModelsReturn {
   models: string[];
@@ -18,7 +18,7 @@ export const useModels = (): UseModelsReturn => {
     setError(null);
 
     try {
-      const openai = await useOpenAI();
+      const openai = await getOpenAI();
       const response = await openai.models.list();
       const modelIds = response.data.map((model) => model.id);
 

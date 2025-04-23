@@ -104,7 +104,7 @@ export const SettingsPanel = () => {
   ];
 
   useEffect(() => {
-    if (useCustomApi) {
+    if (useCustomApi && apiKey && apiEndpoint) {
       refetchModels();
     }
   }, [useCustomApi, apiKey, apiEndpoint]);

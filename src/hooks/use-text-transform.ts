@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SETTINGS } from "../constants";
 import { getStorageValue } from "../utils/storage";
-import { useOpenAI } from "./use-openai";
+import { getOpenAI } from "../utils/openai";
 
 interface UseTextTransformReturn {
   transform: (action: string, text: string) => Promise<string>;
@@ -22,7 +22,7 @@ export const useTextTransform = (): UseTextTransformReturn => {
     setError(null);
 
     try {
-      const openai = await useOpenAI();
+      const openai = await getOpenAI();
       const selectedModel = await getStorageValue(
         SETTINGS.SELECTED_MODEL,
         "gpt-3.5-turbo"
