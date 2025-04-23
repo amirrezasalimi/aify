@@ -12,4 +12,5 @@
 }
 body {
   @apply font-mono;
+  direction: ltr !important;
 }
