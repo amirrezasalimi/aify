@@ -46,14 +46,24 @@ The built extensions will be available in the `dist` directory.
 
 ### Installation
 
-#### Chrome
+#### Method 1: Direct Download
+1. Download the latest version for your browser from [GitHub Releases](https://github.com/amirrezasalimi/aify/releases)
+2. For Chrome/Chromium browsers:
+   - Open chrome://extensions
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select the extracted extension directory
+
+#### Method 2: Build from Source
+
+##### Chrome
 
 1. Open chrome://extensions
 2. Enable "Developer mode"
 3. Click "Load unpacked"
 4. Select the `dist/chrome` directory
 
-#### Firefox
+##### Firefox
 
 1. Open about:debugging
 2. Click "This Firefox"
