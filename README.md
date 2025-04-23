@@ -1,5 +1,7 @@
 # Aify Browser Extension
 
+![Aify Cover](cover.png)
+
 A minimal and powerful AI assistant that enhances your browsing experience with text transformations and translations.
 
 ## Features
