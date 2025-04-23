@@ -4,7 +4,7 @@ import { usePopper } from "react-popper";
 import { CoreModal } from "./core-modal";
 import { onMessage } from "@/utils/messaging";
 import { Button } from "@mantine/core";
-import { ActionMenu } from "./actionmenu";
+import { ActionMenu } from "./action-menu";
 import { ActionResultPopover } from "./action-result-popover";
 import { useTextTransform } from "@/hooks/use-text-transform";
 import useLocalStorage from "@/hooks/use-localstorage";
@@ -140,7 +140,7 @@ export const AppMain: React.FC = () => {
       if (!isEnabled) return;
 
       const target = event.target as HTMLElement;
-      const isInputType = 
+      const isInputType =
         target.tagName.toLowerCase() === "textarea" ||
         (target.tagName.toLowerCase() === "input" &&
           (target as HTMLInputElement).type === "text");
@@ -150,7 +150,7 @@ export const AppMain: React.FC = () => {
 
         setTextareaPopover({
           element: target,
-          text: value
+          text: value,
         });
 
         setSelection(null);
@@ -166,17 +166,21 @@ export const AppMain: React.FC = () => {
 
     const handleInput = (e: Event) => {
       const target = e.target as HTMLTextAreaElement | HTMLInputElement;
-      setTextareaPopover(prev => prev ? {
-        ...prev,
-        text: target.value
-      } : null);
+      setTextareaPopover((prev) =>
+        prev
+          ? {
+              ...prev,
+              text: target.value,
+            }
+          : null
+      );
     };
 
     const element = textareaPopover.element;
-    element.addEventListener('input', handleInput);
-    
+    element.addEventListener("input", handleInput);
+
     return () => {
-      element.removeEventListener('input', handleInput);
+      element.removeEventListener("input", handleInput);
     };
   }, [textareaPopover?.element]);
 
