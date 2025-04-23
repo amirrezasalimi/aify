@@ -52,7 +52,7 @@ export const SettingsPanel = () => {
   );
   const [selectedLanguages, setSelectedLanguages] = useLocalStorage(
     SETTINGS.TRANSLATION_LANGUAGES,
-    ["English"]
+    ["🇺🇸 English"]
   );
   const [testStatus, setTestStatus] = useState<{
     success?: boolean;
