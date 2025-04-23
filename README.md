@@ -11,6 +11,17 @@ A minimal and powerful AI assistant that enhances your browsing experience with 
 - 🎯 One-click default actions
 - 💪 Minimal, clean, and professional UI
 
+### Installation
+
+#### Direct Download
+
+1. Download the latest version for your browser from [GitHub Releases](https://github.com/amirrezasalimi/aify/releases)
+2. For Chrome/Chromium browsers:
+   - Open chrome://extensions
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select the extracted extension directory
+
 ## Development
 
 Built with:
@@ -44,17 +55,7 @@ npm run build:firefox
 
 The built extensions will be available in the `dist` directory.
 
-### Installation
-
-#### Method 1: Direct Download
-1. Download the latest version for your browser from [GitHub Releases](https://github.com/amirrezasalimi/aify/releases)
-2. For Chrome/Chromium browsers:
-   - Open chrome://extensions
-   - Enable "Developer mode"
-   - Click "Load unpacked"
-   - Select the extracted extension directory
-
-#### Method 2: Build from Source
+#### Build from Source
 
 ##### Chrome
 
