@@ -1,0 +1,48 @@
+{
+  "name": "aify-extension",
+  "description": "Aify Extension",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "homepage": "https://github.com/amirrezasalimi/aify",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "@fontsource/plus-jakarta-sans": "^5.2.5",
+    "@mantine/core": "^7.17.4",
+    "@mantine/hooks": "^7.17.4",
+    "@mantine/modals": "^7.17.4",
+    "@mantine/notifications": "^7.17.4",
+    "@tabler/icons-react": "^3.31.0",
+    "@tailwindcss/vite": "^4.1.3",
+    "@types/react-onclickoutside": "^6.7.10",
+    "@use-gesture/react": "^10.3.1",
+    "@webext-core/messaging": "^2.2.0",
+    "@webext-core/storage": "^1.2.0",
+    "lucide-react": "^0.488.0",
+    "openai": "^4.93.0",
+    "postcss": "^8.5.3",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
+    "re-resizable": "^6.11.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-onclickoutside": "^6.13.2",
+    "react-popper": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.2",
+    "@wxt-dev/module-react": "^1.1.3",
+    "typescript": "^5.8.3",
+    "wxt": "^0.20.0"
+  }
+}
