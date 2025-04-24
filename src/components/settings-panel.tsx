@@ -36,7 +36,7 @@ export const SettingsPanel = () => {
     SETTINGS.DEFAULT_ACTION,
     null
   );
-  const [minWords, setMinWords] = useLocalStorage(SETTINGS.MIN_WORDS, 5);
+  const [minWords, setMinWords] = useLocalStorage(SETTINGS.MIN_WORDS, 2);
   const [useCustomApi, setUseCustomApi] = useLocalStorage(
     SETTINGS.USE_CUSTOM_API,
     false

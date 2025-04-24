@@ -47,7 +47,7 @@ export const AppMain: React.FC = () => {
     defaultTextActions
   );
   const [defaultAction] = useLocalStorage(SETTINGS.DEFAULT_ACTION, null);
-  const [minWords] = useLocalStorage(SETTINGS.MIN_WORDS, 5);
+  const [minWords] = useLocalStorage(SETTINGS.MIN_WORDS, 2);
   const [isEnabled] = useLocalStorage(SETTINGS.ENABLED, true);
 
   // Action result popover state
