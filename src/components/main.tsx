@@ -116,7 +116,7 @@ export const AppMain: React.FC = () => {
       ],
     });
 
-  console.log("rendering main component");
+  // console.log("rendering main component");
 
   const handleClose = useCallback(() => {
     if (selection?.referenceElement) {
@@ -366,10 +366,12 @@ export const AppMain: React.FC = () => {
           : (event.target as Element);
 
       // Check if clicked inside menu
-      const isClickedInsideMenu = path?.some((el) => {
-        const element = el as Element;
-        return element.classList?.contains("aify-menu");
-      });
+      const isClickedInsideMenu =
+        realTarget?.closest?.(".aify-menu") ||
+        path?.some((el) => {
+          const element = el as Element;
+          return element.classList?.contains("aify-menu");
+        });
 
       // Don't hide menus if clicking inside them
       if (isClickedInsideMenu) {
@@ -377,10 +379,12 @@ export const AppMain: React.FC = () => {
       }
 
       // Check if clicked inside the active textarea/input
-      const isClickedInsideTextarea = path?.some((el) => {
-        const element = el as Element;
-        return textareaPopover?.element === element;
-      });
+      const isClickedInsideTextarea =
+        realTarget === textareaPopover?.element ||
+        path?.some((el) => {
+          const element = el as Element;
+          return textareaPopover?.element === element;
+        });
 
       // Keep textareaPopover if clicking inside the active input
       if (isClickedInsideTextarea) {
@@ -393,7 +397,7 @@ export const AppMain: React.FC = () => {
       }
 
       // Handle text actions menu click outside
-      if (selection && showTextActions && !isClickedInsideMenu) {
+      if (!isClickedInsideMenu) {
         handleClose();
       }
 
