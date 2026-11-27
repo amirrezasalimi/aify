@@ -20,6 +20,25 @@ import { sendMessage } from "@/utils/messaging";
 import { newChatId } from "@/utils/chat-history";
 import { applyElementBlockRules, type ElementBlockRule } from "@/utils/element-blocking";
 
+function getInputActionField(target: EventTarget | undefined): HTMLElement | null {
+  if (!(target instanceof HTMLElement)) return null;
+  if (target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLInputElement && target.type === "text")) {
+    return target.readOnly || target.matches(":disabled") ? null : target;
+  }
+  if (!target.isContentEditable) return null;
+  // Anchor to the editing host, not to the paragraph or span that was clicked.
+  let field = target;
+  while (field.parentElement?.isContentEditable) field = field.parentElement;
+  return field;
+}
+
+function getInputActionText(field: HTMLElement): string {
+  return field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
+    ? field.value
+    : field.innerText;
+}
+
 export const removeHighlight = () => {
   const activeWrappers = document.querySelectorAll(
     ".shorter-ext-text-wrapper-active"
@@ -283,48 +302,37 @@ export const AppMain: React.FC = () => {
     }
   }, [selection]);
 
-  const handleTextareaFocus = useCallback(
+  const activateInputActions = useCallback((field: HTMLElement) => {
+    setTextareaPopover({ element: field, text: getInputActionText(field) });
+    setSelection(null);
+    setShowTextActions(false);
+  }, []);
+
+  const handleEditableFocus = useCallback(
     (event: FocusEvent) => {
       if (!isEnabled || picking) return;
 
-      const target = event.target as HTMLElement;
-      const isInputType =
-        target.tagName.toLowerCase() === "textarea" ||
-        (target.tagName.toLowerCase() === "input" &&
-          (target as HTMLInputElement).type === "text");
+      const path = event.composedPath();
+      if (path.some((node) => node instanceof HTMLElement && node.localName === "text-transformer-ui")) return;
 
-      if (isInputType) {
-        const value = (target as HTMLTextAreaElement | HTMLInputElement).value;
-
-        setTextareaPopover({
-          element: target,
-          text: value,
-        });
-
-        setSelection(null);
-        setShowTextActions(false);
-      }
+      setShowInputActions(false);
+      const field = getInputActionField(path.find((node) => node instanceof HTMLElement));
+      if (field) activateInputActions(field);
+      else setTextareaPopover(null);
     },
-    [isEnabled, picking]
+    [isEnabled, picking, activateInputActions]
   );
 
   // Listen for input changes to update the text value
   useEffect(() => {
-    if (!textareaPopover?.element) return;
+    const element = textareaPopover?.element;
+    if (!element) return;
 
-    const handleInput = (e: Event) => {
-      const target = e.target as HTMLTextAreaElement | HTMLInputElement;
-      setTextareaPopover((prev) =>
-        prev
-          ? {
-              ...prev,
-              text: target.value,
-            }
-          : null
-      );
+    const handleInput = () => {
+      const text = getInputActionText(element);
+      setTextareaPopover((prev) => prev?.element === element ? { element, text } : prev);
     };
 
-    const element = textareaPopover.element;
     element.addEventListener("input", handleInput);
 
     return () => {
@@ -428,21 +436,16 @@ export const AppMain: React.FC = () => {
     async (event: MouseEvent) => {
       if (!isEnabled || picking) return;
 
-      // Don't process if clicking on Aify menu components
-      if (event.composedPath().some((node) => node instanceof Element && node.classList.contains("aify-menu"))) {
+      const path = event.composedPath();
+      if (path.some((node) => node instanceof Element &&
+        (node.localName === "text-transformer-ui" || node.classList.contains("aify-menu")))) {
         return;
       }
 
-      // Get the active element
-      const activeEl = document.activeElement;
-      const isInputOrTextarea =
-        activeEl &&
-        (activeEl.tagName === "TEXTAREA" ||
-          (activeEl.tagName === "INPUT" &&
-            (activeEl as HTMLInputElement).type === "text"));
-
-      // If we're in an input/textarea, maintain the existing textareaPopover
-      if (isInputOrTextarea) {
+      const field = getInputActionField(path.find((node) => node instanceof HTMLElement));
+      if (field) {
+        // An editor that's already focused won't fire focusin again on click.
+        activateInputActions(field);
         return;
       }
 
@@ -470,7 +473,7 @@ export const AppMain: React.FC = () => {
         });
       }
     },
-    [isEnabled, picking, minWords]
+    [isEnabled, picking, minWords, activateInputActions]
   );
 
   const handleKeyDown = useCallback(
@@ -543,19 +546,19 @@ export const AppMain: React.FC = () => {
     document.addEventListener("mousedown", handleGlobalMouseDown);
     document.addEventListener("mouseup", handleMouseUp);
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("focusin", handleTextareaFocus);
+    document.addEventListener("focusin", handleEditableFocus, true);
 
     return () => {
       document.removeEventListener("mousedown", handleGlobalMouseDown);
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("focusin", handleTextareaFocus);
+      document.removeEventListener("focusin", handleEditableFocus, true);
     };
   }, [
     handleGlobalMouseDown,
     handleMouseUp,
     handleKeyDown,
-    handleTextareaFocus,
+    handleEditableFocus,
   ]);
 
   useEffect(() => {
@@ -725,7 +728,15 @@ export const AppMain: React.FC = () => {
           style={popoverStyle}
           className="z-50 textarea-popover"
         >
-          <div className="relative select-none aify-menu">
+          <div
+            className="relative select-none aify-menu"
+            onMouseDown={(event) => {
+              // Keep the editor's focus and caret when clicking the trigger or a menu button.
+              if (event.button === 0 && event.target instanceof Element && event.target.closest("button")) {
+                event.preventDefault();
+              }
+            }}
+          >
             <Button
               size="xs"
               key={"textarea-aify"}
