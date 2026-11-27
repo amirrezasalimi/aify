@@ -1,6 +1,6 @@
 # Aify Browser Extension
 
-![Aify Cover](cover.png)
+![Aify: Bring the page into chat. The browser sidebar shows a Markdown attachment preview. Features include custom agents, saved Quick Actions, and per-site blocking.](aify-social-features.png)
 
 A minimal and powerful AI assistant that enhances your browsing experience with text transformations and translations.
 
