@@ -4,6 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
+  webExt: {
+    disabled: true,
+  },
   vite(env) {
     return {
       plugins: [tailwindcss()],
@@ -11,6 +14,7 @@ export default defineConfig({
   },
   manifest: {
     permissions: ["storage", "activeTab", "scripting"],
+    host_permissions: ["http://127.0.0.1/*", "http://localhost/*"],
     web_accessible_resources: [
       {
         resources: ["/icon/128.png"],

@@ -1,0 +1,4 @@
+@layer theme, base, mantine, components, utilities;
+@import "tailwindcss";
+@import "../message-text.css";
+@import "../theme.css";

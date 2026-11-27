@@ -9,8 +9,8 @@ import {
   Button,
   Alert,
   Loader,
-  Group,
   MultiSelect,
+  Tabs,
 } from "@mantine/core";
 import { useState } from "react";
 import useLocalStorage from "../hooks/use-localstorage";
@@ -19,10 +19,17 @@ import {
   defaultTextActions,
   defaultInputActions,
 } from "../constants";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { IconBan, IconInfoCircle, IconRobot, IconSettings, IconTarget } from "@tabler/icons-react";
+import { BlockListSettings } from "./block-list-settings";
 import { useModels } from "../hooks/use-models";
+import { AgentSettings } from "./agent-settings";
+import { ElementActionsSettings } from "./element-actions-settings";
+import type { PickPageAttachment } from "../utils/page-attachment";
+import type { AifyTheme } from "./aify-theme-provider";
 
-export const SettingsPanel = () => {
+export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: PickPageAttachment }) => {
+  const [theme, setTheme] = useLocalStorage<AifyTheme>(SETTINGS.THEME, "auto");
+  const [profiles] = useLocalStorage<import("../utils/agents").AgentProfile[]>(SETTINGS.AGENT_PROFILES, []);
   const [isEnabled, setIsEnabled] = useLocalStorage(SETTINGS.ENABLED, true);
   const [inputActions, setInputActions] = useLocalStorage(
     SETTINGS.INPUT_ACTIONS,
@@ -61,11 +68,10 @@ export const SettingsPanel = () => {
   const [isTestingApi, setIsTestingApi] = useState(false);
 
   const {
-    refetch: refetchModels,
     models,
     isLoading: isLoadingModels,
     error: modelsError,
-  } = useModels();
+  } = useModels(useCustomApi, apiEndpoint, apiKey);
 
   const actionOptions = [
     { value: "", label: "None" },
@@ -103,12 +109,6 @@ export const SettingsPanel = () => {
     "🇻🇳 Vietnamese",
   ];
 
-  useEffect(() => {
-    if (useCustomApi && apiKey && apiEndpoint) {
-      refetchModels();
-    }
-  }, [useCustomApi, apiKey, apiEndpoint]);
-
   const handleTestAPI = async () => {
     setTestStatus(undefined);
     setIsTestingApi(true);
@@ -123,12 +123,22 @@ export const SettingsPanel = () => {
     }
   };
 
-  return (
+  const generalSettings = (
     <Stack gap="md" py={4} pb={16}>
       <Switch
         label="Enable Extension"
         checked={isEnabled}
         onChange={(event) => setIsEnabled(event.currentTarget.checked)}
+      />
+
+      <Select
+        label="Theme"
+        description="Auto follows your system appearance."
+        data={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "auto", label: "Auto" }]}
+        value={theme}
+        allowDeselect={false}
+        comboboxProps={{ withinPortal: false }}
+        onChange={(value) => { if (value === "light" || value === "dark" || value === "auto") setTheme(value); }}
       />
 
       <Stack>
@@ -258,5 +268,35 @@ export const SettingsPanel = () => {
         )}
       </Stack>
     </Stack>
+  );
+
+  return (
+    <Tabs defaultValue="general" className="min-w-0">
+      <Tabs.List aria-label="Settings sections" style={{ flexWrap: "wrap" }}>
+        <Tabs.Tab value="general" className="shrink-0 whitespace-nowrap" leftSection={<IconSettings size={16} />}>
+          General
+        </Tabs.Tab>
+        <Tabs.Tab value="agents" className="shrink-0 whitespace-nowrap" leftSection={<IconRobot size={16} />}>
+          Agents
+        </Tabs.Tab>
+        <Tabs.Tab value="elements" className="shrink-0 whitespace-nowrap" leftSection={<IconTarget size={16} />}>Quick Actions</Tabs.Tab>
+        <Tabs.Tab value="block-list" className="shrink-0 whitespace-nowrap" leftSection={<IconBan size={16} />}>Block List</Tabs.Tab>
+      </Tabs.List>
+      <Tabs.Panel value="general" pt="sm">{generalSettings}</Tabs.Panel>
+      <Tabs.Panel value="agents" pt="sm" pb="md">
+        <AgentSettings
+          useCustomApi={useCustomApi}
+          models={models}
+          isLoadingModels={isLoadingModels}
+          modelsError={modelsError}
+        />
+      </Tabs.Panel>
+      <Tabs.Panel value="elements" pt="sm" pb="md">
+        <ElementActionsSettings profiles={profiles} onPick={pickPageAttachment} />
+      </Tabs.Panel>
+      <Tabs.Panel value="block-list" pt="sm" pb="md">
+        <BlockListSettings pick={pickPageAttachment} />
+      </Tabs.Panel>
+    </Tabs>
   );
 };

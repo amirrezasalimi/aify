@@ -1,172 +1,91 @@
-import { useState, useCallback, useEffect } from "react";
-import useLocalStorage from "./use-localstorage";
-import { getOpenAI } from "../utils/openai";
-import { getStorageValue } from "../utils/storage";
-import { SETTINGS } from "../constants";
+import { useEffect, useRef, useState } from "react";
+import { browser } from "wxt/browser";
+import type { AgentProfile } from "../utils/agents";
+import { streamAgentReply } from "../utils/agent-stream";
+import { errorDetails } from "../utils/error-details";
+import type { PageAttachment } from "../utils/page-attachment";
+import { chatKey, conversationMessages, newChatId, type ChatTurn, type SavedChat } from "../utils/chat-history";
 
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
-  isReloading?: boolean;
-}
-
-export type ChatTune =
-  | "Professional"
-  | "Creative"
-  | "Friendly"
-  | "Direct"
-  | "Technical";
-export type ResponseLength = "short" | "normal" | "long";
-
-interface ChatConfig {
-  tune: ChatTune;
-  responseLength: ResponseLength;
-}
-
-export const useChat = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+export function useChat(agent: AgentProfile, sidebar: boolean, initialChat?: SavedChat) {
+  const [chat, setChat] = useState<SavedChat | undefined>(initialChat);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useLocalStorage("chatConfig", {
-    tune: "Professional" as ChatTune,
-    responseLength: "normal" as ResponseLength,
-  });
+  const [saveError, setSaveError] = useState<string>();
+  const controller = useRef<AbortController | null>(null);
+  const lastResume = useRef(initialChat);
 
-  const getTunePrompt = (tune: ChatTune) => {
-    const tunePrompts = {
-      Professional: "Respond in a professional and formal manner",
-      Creative: "Be creative and think outside the box",
-      Friendly: "Respond in a friendly and casual tone",
-      Direct: "Be concise and straight to the point",
-      Technical: "Use technical language and precise terms",
-    };
-    return tunePrompts[tune];
-  };
+  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    if (isLoading || !initialChat || initialChat === lastResume.current) return;
+    lastResume.current = initialChat;
+    setChat(initialChat);
+    setSaveError(undefined);
+  }, [initialChat, isLoading]);
 
-  const getLengthPrompt = (length: ResponseLength) => {
-    const lengthPrompts = {
-      short: "Keep responses very brief and concise",
-      normal: "Provide standard-length responses",
-      long: "Provide detailed and comprehensive responses",
-    };
-    return lengthPrompts[length];
-  };
-
-  const getSystemPrompt = (
-    tune: ChatTune,
-    responseLength: ResponseLength,
-    context?: string
-  ) => {
-    return `${getTunePrompt(tune)}.\n${getLengthPrompt(responseLength)}.\n${
-      context
-        ? `Context: "${context}"\n Answer or perform actions toward this context.`
-        : ""
-    }`;
-  };
-
-  const sendMessage = async (content: string, context?: string) => {
+  async function run(input: string, context?: string, replaceIndex?: number, attachments?: PageAttachment[], freshAgent?: AgentProfile) {
+    if (controller.current || !input.trim()) return;
+    const abort = new AbortController();
+    controller.current = abort;
     setIsLoading(true);
-    setError(null);
-
+    setSaveError(undefined);
+    const base = freshAgent ? undefined : chat;
+    const replyAgent = freshAgent ?? agent;
+    const turns = base?.turns.slice(0, replaceIndex ?? base.turns.length) ?? [];
+    let turn: ChatTurn = {
+      id: newChatId(), input, context, attachments, text: "", agentId: replyAgent.id, agentName: replyAgent.name,
+      response: [], activity: [], status: "running",
+    };
+    // Edits and regenerations fork the transcript rather than deleting later turns.
+    const id = replaceIndex !== undefined ? newChatId() : base?.id ?? newChatId();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending = Promise.resolve();
+    const snapshot = (): SavedChat => ({ version: 1, id, updatedAt: Date.now(), turns: [...turns, turn] });
+    const persist = () => {
+      clearTimeout(timer);
+      timer = undefined;
+      const data = snapshot();
+      pending = pending.then(async () => {
+        await browser.storage.local.set({ [chatKey(id)]: data });
+        setSaveError(undefined);
+      }).catch((error) => setSaveError(errorDetails(error, "Browser storage rejected the chat.")));
+    };
+    const update = (change: Partial<ChatTurn>, immediate = false) => {
+      turn = { ...turn, ...change };
+      setChat(snapshot());
+      if (immediate) persist();
+      else timer ??= setTimeout(persist, 500);
+    };
+    update({}, true);
     try {
-      const openai = await getOpenAI();
-      const selectedModel = await getStorageValue(
-        SETTINGS.SELECTED_MODEL,
-        "gpt-3.5-turbo"
-      );
-
-      const newMessage: Message = { role: "user", content };
-      setMessages((prev) => [...prev, newMessage]);
-
-      const systemPrompt = getSystemPrompt(
-        config.tune,
-        config.responseLength,
-        context
-      );
-
-      const messagesToSend = [
-        { role: "system" as const, content: systemPrompt },
-        newMessage,
-      ];
-
-      const completion = await openai.chat.completions.create({
-        messages: messagesToSend,
-        model: selectedModel,
-        temperature: 0.7,
-      });
-
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: completion.choices[0]?.message?.content || "",
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    } catch (err) {
-      setIsLoading(false);
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-      setError(errorMessage);
-    }
-  };
-
-  const reloadMessage = async (messageIndex: number, context?: string) => {
-    if (messageIndex < 0 || messageIndex >= messages.length) return;
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const openai = await getOpenAI();
-      const selectedModel = await getStorageValue(
-        SETTINGS.SELECTED_MODEL,
-        "gpt-3.5-turbo"
-      );
-
-      const messagesToSend = messages.slice(0, messageIndex);
-      setMessages((prev) => prev.slice(0, messageIndex));
-
-      const systemPrompt = getSystemPrompt(
-        config.tune,
-        config.responseLength,
-        context
-      );
-      const completion = await openai.chat.completions.create({
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messagesToSend.map(({ role, content }) => ({ role, content })),
-        ],
-        model: selectedModel,
-        temperature: 0.7,
-      });
-
-      const newMessage = completion.choices[0]?.message?.content || "";
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: newMessage,
-          isReloading: false,
+      await streamAgentReply({
+        agent: replyAgent, sidebar, signal: abort.signal, messages: conversationMessages([...turns, turn]),
+        onText: (delta) => update({ text: turn.text + delta }),
+        onModel: (model) => update({ model }),
+        onResponse: (response) => update({ response }, true),
+        onActivity: (activity) => {
+          const previous = turn.activity.findIndex(({ id }) => id === activity.id);
+          update({ activity: previous < 0 ? [...turn.activity, activity] : turn.activity.map((item, i) => i === previous ? activity : item) }, true);
         },
-      ]);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-      setError(errorMessage);
+      });
+      update({ status: "done" }, true);
+    } catch (error) {
+      const details = errorDetails(error, "Could not complete this reply.");
+      update({
+        status: abort.signal.aborted ? "stopped" : "error",
+        error: abort.signal.aborted ? undefined : details,
+        activity: turn.activity.map((activity) => activity.status === "running"
+          ? { ...activity, status: "error", error: abort.signal.aborted ? "The reply was stopped before the tool finished." : details }
+          : activity),
+      }, true);
+    } finally {
+      await pending;
+      controller.current = null;
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  };
-
-  const clearMessages = () => setMessages([]);
+  }
 
   return {
-    messages,
-    isLoading,
-    error,
-    sendMessage,
-    clearMessages,
-    reloadMessage,
-    config,
-    setConfig,
+    chat, turns: chat?.turns ?? [], isLoading, saveError, run,
+    stop: () => controller.current?.abort(),
+    newChat: () => { if (!controller.current) { setChat(undefined); setSaveError(undefined); } },
   };
-};
+}

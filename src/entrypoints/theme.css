@@ -1,0 +1,37 @@
+@theme inline {
+  --color-aify-surface: var(--mantine-color-body, white);
+}
+
+/* Keep the existing light palette, and adapt custom surfaces and text in dark mode. */
+[data-mantine-color-scheme="dark"] {
+  --color-neutral-50: var(--mantine-color-dark-8);
+  --color-zinc-100: var(--mantine-color-dark-6);
+  --color-gray-50: var(--mantine-color-dark-8);
+  --color-gray-100: var(--mantine-color-dark-6);
+  --color-gray-200: var(--mantine-color-dark-5);
+  --color-gray-300: var(--mantine-color-dark-4);
+  --color-neutral-200: var(--mantine-color-dark-4);
+  --color-gray-500: var(--mantine-color-dark-2);
+  --color-gray-600: var(--mantine-color-dark-1);
+  --color-gray-700: var(--mantine-color-dark-0);
+}
+
+[data-mantine-color-scheme="dark"] :is(.bg-blue-50, .bg-blue-100, .hover\:bg-blue-100:hover) {
+  background-color: #1b304a;
+}
+
+[data-mantine-color-scheme="dark"] :is(.border-blue-100, .border-blue-200) {
+  border-color: #375578;
+}
+
+[data-mantine-color-scheme="dark"] :is(.text-blue-700, .text-blue-800, .hover\:text-blue-900:hover) {
+  color: var(--mantine-color-blue-2);
+}
+
+[data-mantine-color-scheme="dark"] .bg-red-50 {
+  background-color: #3b2027;
+}
+
+[data-mantine-color-scheme="dark"] :is(.text-red-500, .text-red-800, .text-red-900) {
+  color: var(--mantine-color-red-3);
+}

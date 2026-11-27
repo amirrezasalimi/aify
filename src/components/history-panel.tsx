@@ -51,7 +51,7 @@ export const HistoryPanel = () => {
               .map((item, index) => (
                 <div
                   key={index}
-                  className="bg-white p-3 border border-gray-200 rounded-lg"
+                  className="bg-aify-surface p-3 border border-gray-200 rounded-lg"
                 >
                   <div className="flex justify-between items-center mb-2">
                     <Text size="sm" fw={500} c="blue">

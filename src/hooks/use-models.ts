@@ -1,45 +1,53 @@
 import { useState, useEffect } from "react";
-import { getOpenAI } from "../utils/openai";
 
 interface UseModelsReturn {
   models: string[];
   isLoading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
 }
 
-export const useModels = (): UseModelsReturn => {
-  const [models, setModels] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const emptyModels: UseModelsReturn = { models: [], isLoading: false, error: null };
 
-  const fetchModels = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const openai = await getOpenAI();
-      const response = await openai.models.list();
-      const modelIds = response.data.map((model) => model.id);
-
-      setModels(modelIds);
-      setIsLoading(false);
-    } catch (err) {
-      setIsLoading(false);
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-      setError(errorMessage);
-    }
-  };
+export const useModels = (enabled: boolean, endpoint: string, apiKey: string): UseModelsReturn => {
+  const baseURL = endpoint.trim();
+  const [result, setResult] = useState<{
+    baseURL: string;
+    apiKey: string;
+    data: UseModelsReturn;
+  } | null>(null);
 
   useEffect(() => {
-    fetchModels();
-  }, []);
+    setResult(null);
+    if (!enabled || !baseURL) return;
 
-  return {
-    models,
-    isLoading,
-    error,
-    refetch: fetchModels,
-  };
+    const controller = new AbortController();
+    // Wait for provider settings to settle before requesting the model list.
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Could not load models.");
+        const { data } = await response.json() as { data: { id: string }[] };
+        const models = [...new Set(data.map(({ id }) => id).filter((id) => typeof id === "string" && id))];
+        if (!controller.signal.aborted) {
+          setResult({ baseURL, apiKey, data: { models, isLoading: false, error: null } });
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setResult({ baseURL, apiKey, data: { ...emptyModels, error: "Could not load models from the custom API." } });
+        }
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [enabled, baseURL, apiKey]);
+
+  if (!enabled || !baseURL) return emptyModels;
+  if (result?.baseURL === baseURL && result.apiKey === apiKey) return result.data;
+  return { ...emptyModels, isLoading: true };
 };

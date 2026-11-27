@@ -1,5 +1,6 @@
 import React from "react";
-import { usePopper } from "react-popper";
+import type { ReferenceType } from "@floating-ui/react-dom";
+import { useAnchoredPopover } from "../hooks/use-anchored-popover";
 import { Loader, Text, ActionIcon, Tooltip } from "@mantine/core";
 import {
   IconCheck,
@@ -9,18 +10,12 @@ import {
 } from "@tabler/icons-react";
 import { useClipboard } from "@mantine/hooks";
 import { getActionIcon } from "../utils/action-icon";
-
-// Helper function to check if text starts with RTL characters
-const isRTL = (text: string) => {
-  const rtlRegex =
-    /^[⁦\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/;
-  return rtlRegex.test(text);
-};
+import { ResponseMarkdown } from "./response-markdown";
 
 interface ActionResultPopoverProps {
   opened: boolean;
   onClose: () => void;
-  referenceElement: HTMLElement | null;
+  referenceElement: ReferenceType | null;
   action: string;
   text: string;
   result?: string;
@@ -57,7 +52,7 @@ export const ActionResultPopover: React.FC<ActionResultPopoverProps> = ({
       // Use composedPath for shadow DOM support
       const path = event.composedPath ? event.composedPath() : [];
       const isInPopover = popperElement && path.includes(popperElement);
-      const isInReference = referenceElement && path.includes(referenceElement);
+      const isInReference = referenceElement instanceof Element && path.includes(referenceElement);
       if (!isInPopover && !isInReference) {
         onClose();
       }
@@ -68,32 +63,15 @@ export const ActionResultPopover: React.FC<ActionResultPopoverProps> = ({
     };
   }, [opened, popperElement, referenceElement, onClose]);
 
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
-    placement: "bottom-start", // Changed from "bottom" to "bottom-start" to align with the start of the reference
-    modifiers: [
-      {
-        name: "offset",
-        options: {
-          offset: [0, 16],
-        },
-      },
-      {
-        name: "preventOverflow",
-        options: {
-          boundary: document.body,
-        },
-      },
-    ],
-  });
+  const popoverStyle = useAnchoredPopover(referenceElement, popperElement, "bottom-start", 16, true);
 
   if (!opened || !referenceElement) return null;
 
   return (
     <div
       ref={setPopperElement}
-      style={styles.popper}
-      {...attributes.popper}
-      className="z-[1000] bg-white shadow-md p-4 !border !border-gray-200 !border-solid rounded-md w-[320px] action-result-popover"
+      style={popoverStyle}
+      className="z-[1000] w-[320px] overflow-y-auto overscroll-contain bg-aify-surface shadow-md p-4 !border !border-gray-200 !border-solid rounded-md action-result-popover"
     >
       <div className="space-y-2">
         <div className="flex justify-between items-center">
@@ -138,7 +116,7 @@ export const ActionResultPopover: React.FC<ActionResultPopoverProps> = ({
               <Text size="xs" c="dimmed">
                 Result:
               </Text>
-              <Tooltip label="Copy to clipboard">
+              <Tooltip label="Copy to clipboard" withinPortal={false}>
                 <ActionIcon
                   size="sm"
                   variant="subtle"
@@ -149,11 +127,8 @@ export const ActionResultPopover: React.FC<ActionResultPopoverProps> = ({
                 </ActionIcon>
               </Tooltip>
             </div>
-            <div
-              className="bg-gray-50 p-2 rounded text-sm"
-              dir={isRTL(result) ? "rtl" : "ltr"}
-            >
-              {result}
+            <div className="bg-gray-50 p-2 rounded text-sm">
+              <ResponseMarkdown text={result} />
             </div>
           </div>
         )}

@@ -11,7 +11,9 @@ import { useViewportSize } from "@mantine/hooks";
 import { Title, Badge } from "@mantine/core";
 import { Resizable } from "re-resizable";
 import { SettingsPanel } from "./settings-panel";
-import { HistoryPanel } from "./history-panel";
+import { ChatHistoryPanel } from "./chat-history-panel";
+import type { SavedChat } from "../utils/chat-history";
+import type { ElementActionRequest, PickPageAttachment } from "../utils/page-attachment";
 import ChatPanel from "./chat-panel";
 import { WEBSITE_URL } from "../constants";
 
@@ -29,6 +31,9 @@ interface CoreModalProps {
   context?: string;
   onContextChange?: (context: string | null) => void;
   showSettings?: boolean;
+  pickPageAttachment: PickPageAttachment;
+  savedAction?: ElementActionRequest;
+  onSavedActionStart?: () => void;
 }
 
 interface ModalDimensions {
@@ -42,6 +47,9 @@ export const CoreModal = ({
   context,
   onContextChange,
   showSettings: initialShowSettings = false,
+  pickPageAttachment,
+  savedAction,
+  onSavedActionStart,
 }: CoreModalProps) => {
   const { width: vpWidth, height: vpHeight } = useViewportSize();
 
@@ -80,6 +88,15 @@ export const CoreModal = ({
   const [scale, setScale] = useState(1);
   const [showSettings, setShowSettings] = useState(initialShowSettings);
   const [showHistory, setShowHistory] = useState(false);
+  const [resume, setResume] = useState<SavedChat>();
+  const [running, setRunning] = useState(false);
+  useEffect(() => { if (!isOpen) setResume(undefined); }, [isOpen]);
+  useEffect(() => {
+    if (!savedAction) return;
+    setShowSettings(false);
+    setShowHistory(false);
+    setResume(undefined);
+  }, [savedAction]);
 
   // Add a ref to track if we're actually dragging
   const isDragging = useRef(false);
@@ -276,13 +293,15 @@ export const CoreModal = ({
           </div>
         </div>
         <div className="flex-1 p-2 overflow-auto">
-          {showSettings ? (
-            <SettingsPanel />
-          ) : showHistory ? (
-            <HistoryPanel />
-          ) : (
-            <ChatPanel context={context} onContextChange={onContextChange} />
-          )}
+          <div className="h-full" hidden={showSettings || showHistory}>
+            <ChatPanel context={context} onContextChange={onContextChange} resumeChat={savedAction ? undefined : resume} onRunningChange={setRunning} pickPageAttachment={pickPageAttachment} savedAction={savedAction} onSavedActionStart={onSavedActionStart} />
+          </div>
+          {showSettings && <SettingsPanel pickPageAttachment={pickPageAttachment} />}
+          {showHistory && <ChatHistoryPanel running={running} onResume={(chat) => {
+            setResume({ ...chat });
+            onContextChange?.(null);
+            setShowHistory(false);
+          }} />}
         </div>
       </div>
     </Resizable>

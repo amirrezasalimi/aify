@@ -1,0 +1,8 @@
+.aify-message-text {
+  font-family: "Aify Estedad", var(--aify-message-fallback, var(--mantine-font-family, sans-serif));
+  text-align: start;
+}
+
+.aify-message-text :is(pre, code) {
+  font-family: "Aify Estedad", var(--font-mono, monospace);
+}

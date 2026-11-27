@@ -9,7 +9,8 @@ type StorageError = {
 
 const useLocalStorage = <T>(
   key: string,
-  initialValue: T
+  initialValue: T,
+  initialize = true
 ): [
   T,
   (value: T | ((prevState: T) => T)) => void,
@@ -37,7 +38,7 @@ const useLocalStorage = <T>(
         if (isMounted) {
           if (raw !== null) {
             setStoredValue(JSON.parse(raw));
-          } else {
+          } else if (initialize) {
             // Set the initial value in storage only if it doesn't exist
             await localExtStorage.setItem(
               key,
@@ -89,7 +90,7 @@ const useLocalStorage = <T>(
       isMounted = false;
       unsub();
     };
-  }, [key]); // Only depend on the key
+  }, [key, initialize]);
 
   // Memoized setter function
   const setValue = useCallback(

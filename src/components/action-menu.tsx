@@ -1,26 +1,33 @@
 import React from "react";
-import { Button } from "@mantine/core";
 import { IconMessage, IconSettings } from "@tabler/icons-react";
 import { getActionIcon } from "../utils/action-icon";
 import useLocalStorage from "@/hooks/use-localstorage";
 import { SETTINGS } from "@/constants";
+import { useAnchoredPopover } from "../hooks/use-anchored-popover";
 
 interface ActionMenuProps {
   actions: string[];
   onSelect: (action: string) => void;
   show: boolean;
-  className?: string;
+  anchor: HTMLElement | null;
 }
+
+const rowClass = "flex w-full items-center gap-2 px-3 py-1.5 text-start text-sm text-gray-700 hover:bg-gray-100";
 
 export const ActionMenu: React.FC<ActionMenuProps> = ({
   actions,
   onSelect,
   show,
-  className = "",
+  anchor,
 }) => {
   const [selectedLanguages] = useLocalStorage(SETTINGS.TRANSLATION_LANGUAGES, [
     "English",
   ]);
+  const [menu, setMenu] = React.useState<HTMLDivElement | null>(null);
+  const style = useAnchoredPopover(show ? anchor : null, menu, "bottom-start", 4, true);
+  // An opacity-hidden menu still participates in text selection and copying.
+  if (!show) return null;
+
   const combinedActions = [
     ...selectedLanguages.map((lang) => `Translate to ${lang}`),
     ...actions,
@@ -28,20 +35,18 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({
 
   return (
     <div
-      className={`absolute top-full left-0 mt-1 bg-white !border !border-gray-200 !border-solid rounded-md shadow-lg transform origin-top transition-all duration-150 ease-out min-w-[250px] ${
-        show
-          ? "opacity-100 scale-100"
-          : "opacity-0 scale-95 pointer-events-none"
-      } ${className}`}
+      ref={setMenu}
+      style={style}
+      className="z-10 w-[230px] select-none overflow-y-auto overscroll-contain rounded-md !border !border-solid !border-gray-200 bg-aify-surface shadow-lg"
     >
       <button
         onClick={(e) => {
           e.preventDefault();
           onSelect("Chat");
         }}
-        className="flex items-center gap-2 hover:bg-gray-100 px-4 py-2 rounded-t-md w-full text-gray-700 text-sm text-left"
+        className={`${rowClass} rounded-t-md`}
       >
-        <IconMessage size={16} />
+        <IconMessage size={16} className="shrink-0" />
         <span>Chat</span>
       </button>
 
@@ -56,10 +61,10 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({
               e.preventDefault();
               onSelect(action);
             }}
-            className="flex items-center gap-2 hover:bg-gray-100 px-4 py-2 w-full text-gray-700 text-sm text-left"
+            className={rowClass}
           >
-            <Icon size={16} />
-            <span>{action}</span>
+            <Icon size={16} className="shrink-0" />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{action}</span>
           </button>
         );
       })}
@@ -71,9 +76,9 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({
           e.preventDefault();
           onSelect("Settings");
         }}
-        className="flex items-center gap-2 hover:bg-gray-100 px-4 py-2 rounded-b-md w-full text-gray-700 text-sm text-left"
+        className={`${rowClass} rounded-b-md`}
       >
-        <IconSettings size={16} />
+        <IconSettings size={16} className="shrink-0" />
         <span>Settings</span>
       </button>
     </div>

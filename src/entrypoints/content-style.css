@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./message-text.css";
+@import "./theme.css";
 
 @font-face {
   font-family: "Monaspace Radon";
@@ -11,6 +13,12 @@
       format("woff");
 }
 body {
+  --aify-message-fallback: var(--font-mono, monospace);
   @apply font-mono;
   direction: ltr !important;
+}
+
+#text-transformer-root {
+  color: var(--mantine-color-text);
+  color-scheme: var(--mantine-color-scheme);
 }

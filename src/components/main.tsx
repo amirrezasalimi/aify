@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import type { ReferenceType, VirtualElement } from "@floating-ui/react-dom";
 import { SETTINGS, defaultInputActions, defaultTextActions } from "@/constants";
-import { usePopper } from "react-popper";
+import { useAnchoredPopover } from "../hooks/use-anchored-popover";
 import { CoreModal } from "./core-modal";
 import { onMessage } from "@/utils/messaging";
 import { Button } from "@mantine/core";
@@ -9,6 +10,15 @@ import { ActionResultPopover } from "./action-result-popover";
 import { useTextTransform } from "@/hooks/use-text-transform";
 import useLocalStorage from "@/hooks/use-localstorage";
 import { useHistory } from "@/hooks/use-history";
+import { browser } from "wxt/browser";
+import { BLOCK_MARKER_PICKER_PORT, BLOCK_PICKER_PORT, PAGE_PICKER_PORT, type PagePickerMode, type PickPageAttachment, type PagePickerMessage, type PagePickerResult } from "@/utils/page-attachment";
+import { PageElementPicker } from "./page-element-picker";
+import type { ElementAction } from "@/utils/page-attachment";
+import type { ElementActionRequest } from "@/utils/page-attachment";
+import { createElementCapture, canPickElement } from "@/utils/capture-element";
+import { sendMessage } from "@/utils/messaging";
+import { newChatId } from "@/utils/chat-history";
+import { applyElementBlockRules, type ElementBlockRule } from "@/utils/element-blocking";
 
 export const removeHighlight = () => {
   const activeWrappers = document.querySelectorAll(
@@ -25,7 +35,7 @@ export const AppMain: React.FC = () => {
 
   const [selection, setSelection] = useState<{
     text: string;
-    referenceElement: HTMLElement | null;
+    referenceElement: VirtualElement;
   } | null>(null);
   const [textareaPopover, setTextareaPopover] = useState<{
     element: HTMLElement;
@@ -36,6 +46,77 @@ export const AppMain: React.FC = () => {
   const [showTextActions, setShowTextActions] = useState(false);
   const [context, setContext] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [pickerMode, setPickerMode] = useState<PagePickerMode>();
+  const picking = !!pickerMode;
+  const [elementActionButton, setElementActionButton] = useState<{ action: ElementAction; element: Element; x: number; y: number }>();
+  const [quickAction, setQuickAction] = useState<ElementActionRequest>();
+  const [quickActionError, setQuickActionError] = useState<string>();
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
+  const picker = useRef<((result: PagePickerResult) => void) | null>(null);
+  const pickerReady = useRef<() => void>(undefined);
+  const markPickerReady = useCallback(() => {
+    pickerReady.current?.();
+    pickerReady.current = undefined;
+  }, []);
+  const finishPicker = useCallback((result: PagePickerResult) => {
+    const finish = picker.current;
+    picker.current = null;
+    pickerReady.current = undefined;
+    setPickerMode(undefined);
+    finish?.(result);
+  }, []);
+
+  const startPicker = useCallback((signal: AbortSignal, mode?: PagePickerMode, onReady?: () => void) => new Promise<Awaited<ReturnType<PickPageAttachment>>>((resolve, reject) => {
+    if (signal.aborted) return resolve(null);
+    if (!/^https?:$/.test(location.protocol)) return reject(new Error("Open a regular webpage to attach an element."));
+    if (picker.current) return reject(new Error("A page selection is already active."));
+    if (typeof mode === "object") {
+      const { host, selector } = mode.markerParent;
+      if (host !== location.hostname) return reject(new Error(`Open ${host} to select markers for this rule.`));
+      try {
+        if (!document.querySelector(selector)) return reject(new Error("No matching parent on this page. Try another page or reselect the parent."));
+      } catch (error) { return reject(error); }
+    }
+    pickerReady.current = onReady;
+    const cancel = () => finishPicker({ attachment: null });
+    signal.addEventListener("abort", cancel, { once: true });
+    picker.current = (result) => {
+      signal.removeEventListener("abort", cancel);
+      if ("error" in result) reject(new Error(result.error));
+      else resolve(result.attachment);
+    };
+    setPickerMode(mode ?? "attachment");
+  }), [finishPicker]);
+
+  useEffect(() => {
+    const connect: Parameters<typeof browser.runtime.onConnect.addListener>[0] = (port) => {
+      if (![PAGE_PICKER_PORT, BLOCK_PICKER_PORT, BLOCK_MARKER_PICKER_PORT].includes(port.name) || port.sender?.id !== browser.runtime.id) return;
+      const abort = new AbortController();
+      port.onDisconnect.addListener(() => abort.abort());
+      const reply = (message: PagePickerMessage) => { if (!abort.signal.aborted) port.postMessage(message); };
+      const start = (mode?: PagePickerMode) => void startPicker(abort.signal, mode, () => reply({ ready: true })).then(
+        (attachment) => reply({ attachment }),
+        (error: unknown) => reply({ error: error instanceof Error ? error.message : "Could not start the page picker." }),
+      );
+      if (port.name === BLOCK_MARKER_PICKER_PORT) {
+        const receive = (mode: { markerParent?: { host?: unknown; selector?: unknown } } | undefined) => {
+          port.onMessage.removeListener(receive);
+          const { host, selector } = mode?.markerParent ?? {};
+          if (typeof host !== "string" || typeof selector !== "string" || !selector) return reply({ error: "Missing parent selector." });
+          start({ markerParent: { host, selector } });
+        };
+        port.onMessage.addListener(receive);
+      } else start(port.name === BLOCK_PICKER_PORT ? "block" : undefined);
+    };
+    browser.runtime.onConnect.addListener(connect);
+    return () => {
+      browser.runtime.onConnect.removeListener(connect);
+      const finish = picker.current;
+      picker.current = null;
+      pickerReady.current = undefined;
+      finish?.({ attachment: null });
+    };
+  }, [startPicker]);
 
   // Use useLocalStorage for all settings
   const [inputActionsList] = useLocalStorage(
@@ -49,12 +130,121 @@ export const AppMain: React.FC = () => {
   const [defaultAction] = useLocalStorage(SETTINGS.DEFAULT_ACTION, null);
   const [minWords] = useLocalStorage(SETTINGS.MIN_WORDS, 2);
   const [isEnabled] = useLocalStorage(SETTINGS.ENABLED, true);
+  const [elementActions] = useLocalStorage<ElementAction[]>(SETTINGS.ELEMENT_ACTIONS, []);
+  const [blockRules] = useLocalStorage<ElementBlockRule[]>(SETTINGS.ELEMENT_BLOCK_RULES, []);
+  const countedBlocks = useRef(new Map<string, WeakSet<Element>>());
+  useEffect(() => {
+    const ruleIds = new Set(blockRules.map(({ id }) => id));
+    for (const id of countedBlocks.current.keys()) {
+      if (!ruleIds.has(id)) countedBlocks.current.delete(id);
+    }
+    if (isEnabled) return applyElementBlockRules(blockRules, {
+      seen: countedBlocks.current,
+      record: (counts) => {
+        void sendMessage("recordBlockedElements", counts).catch((error) => {
+          console.debug("Could not save Block List counts:", error);
+        });
+      },
+    });
+  }, [isEnabled, blockRules]);
+
+  useEffect(() => {
+    setElementActionButton(undefined);
+    if (!isEnabled || picking || !elementActions.length) return;
+    let hideTimer: number | undefined;
+    const keepVisible = () => {
+      window.clearTimeout(hideTimer);
+      hideTimer = undefined;
+    };
+    const hideSoon = () => {
+      if (hideTimer !== undefined) return;
+      hideTimer = window.setTimeout(() => {
+        hideTimer = undefined;
+        if (!actionButtonRef.current?.matches(":hover")) setElementActionButton(undefined);
+      }, 300);
+    };
+    const move = (event: PointerEvent) => {
+      if (!event.isTrusted) return;
+      const button = actionButtonRef.current;
+      if (button && (event.composedPath().includes(button) || button.matches(":hover"))) {
+        keepVisible();
+        return;
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target || !canPickElement(target)) { hideSoon(); return; }
+      const match = elementActions.find((action) => {
+        if (action.host !== location.hostname) return false;
+        try { return !!target.closest(action.selector); } catch { return false; }
+      });
+      const element = match ? target.closest(match.selector) : null;
+      if (!match || !element) { hideSoon(); return; }
+      keepVisible();
+      const rect = element.getBoundingClientRect();
+      const x = Math.max(8, Math.min(innerWidth - 150, rect.right + 6));
+      const y = Math.max(8, Math.min(innerHeight - 40, Math.max(rect.top, event.clientY - 12)));
+      setElementActionButton((current) => current?.element === element && current.action === match && current.x === x && current.y === y
+        ? current : { action: match, element, x, y });
+    };
+    const clear = (event: PointerEvent) => {
+      if (event.isTrusted && !event.relatedTarget) hideSoon();
+    };
+    document.addEventListener("pointerover", move, true);
+    document.addEventListener("pointermove", move, true);
+    document.addEventListener("pointerout", clear, true);
+    return () => {
+      keepVisible();
+      document.removeEventListener("pointerover", move, true);
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerout", clear, true);
+    };
+  }, [isEnabled, picking, elementActions]);
+
+  const highlightedActionTarget = isEnabled && !picking ? elementActionButton?.element : undefined;
+  useEffect(() => {
+    if (!highlightedActionTarget?.isConnected) return;
+    const attribute = "data-aify-quick-action-target";
+    const sheet = new CSSStyleSheet();
+    sheet.insertRule(`[${attribute}] { outline: 1px solid rgba(59, 130, 246, 0.55) !important; outline-offset: 2px !important; }`);
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    highlightedActionTarget.setAttribute(attribute, "");
+    return () => {
+      highlightedActionTarget.removeAttribute(attribute);
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((item) => item !== sheet);
+    };
+  }, [highlightedActionTarget]);
+
+  const runElementAction = useCallback(async () => {
+    const current = elementActionButton;
+    if (!current) return;
+    setElementActionButton(undefined);
+    setQuickActionError(undefined);
+    try {
+      if (!current.element.isConnected) throw new Error("That area is no longer on the page.");
+      const capture = createElementCapture();
+      capture.sample(current.element);
+      const result = capture.result();
+      if (!result.text && !result.images.length) throw new Error("No text or images could be captured from that area.");
+      await sendMessage("launchSavedElementAction", {
+        action: current.action,
+        attachment: { ...result, id: newChatId(), label: current.action.title, selector: current.action.selector, pageHost: location.hostname },
+      });
+    } catch (error) {
+      setQuickActionError(error instanceof Error ? error.message : "Could not start a chat.");
+    }
+  }, [elementActionButton]);
+
+  useEffect(() => onMessage("runSavedElementAction", ({ data }) => {
+    setContext(null);
+    setShowSettings(false);
+    setQuickAction(data);
+    setIsCoreModalOpen(true);
+  }), []);
 
   // Action result popover state
   const [actionResult, setActionResult] = useState<{
     action: string;
     text: string;
-    referenceElement: HTMLElement | null;
+    referenceElement: ReferenceType;
     loading: boolean;
     result?: string;
     error?: string;
@@ -64,68 +254,26 @@ export const AppMain: React.FC = () => {
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(
     null
   );
-  const { styles, attributes } = usePopper(
+  const popoverStyle = useAnchoredPopover(
     textareaPopover?.element || null,
     popperElement,
-    {
-      placement: "bottom-start",
-      modifiers: [
-        {
-          name: "offset",
-          options: {
-            offset: [0, 4],
-          },
-        },
-        {
-          name: "preventOverflow",
-          options: {
-            padding: 8,
-          },
-        },
-      ],
-    }
+    "bottom-start", 4
   );
 
   // Popper state for selection button
   const [selectionButtonElement, setSelectionButtonElement] =
     useState<HTMLDivElement | null>(null);
-  const { styles: selectionStyles, attributes: selectionAttributes } =
-    usePopper(selection?.referenceElement || null, selectionButtonElement, {
-      placement: "bottom",
-      strategy: "fixed",
-      modifiers: [
-        {
-          name: "offset",
-          options: {
-            offset: [0, 10],
-          },
-        },
-        {
-          name: "preventOverflow",
-          options: {
-            padding: 8,
-            boundary: document.body,
-          },
-        },
-        {
-          name: "flip",
-          options: {
-            fallbackPlacements: ["bottom-start", "bottom-end"],
-          },
-        },
-      ],
-    });
+  const [selectionMenuAnchor, setSelectionMenuAnchor] = useState<HTMLButtonElement | null>(null);
+  const [inputMenuAnchor, setInputMenuAnchor] = useState<HTMLButtonElement | null>(null);
+  const selectionStyle = useAnchoredPopover(selection?.referenceElement || null, selectionButtonElement, "bottom", 10);
 
   // console.log("rendering main component");
 
   const handleClose = useCallback(() => {
-    if (selection?.referenceElement) {
-      selection.referenceElement.remove();
-    }
     setSelection(null);
     setShowTextActions(false);
     removeHighlight();
-  }, [selection]);
+  }, []);
 
   // Clean up textarea popover when text selection changes
   useEffect(() => {
@@ -137,7 +285,7 @@ export const AppMain: React.FC = () => {
 
   const handleTextareaFocus = useCallback(
     (event: FocusEvent) => {
-      if (!isEnabled) return;
+      if (!isEnabled || picking) return;
 
       const target = event.target as HTMLElement;
       const isInputType =
@@ -157,7 +305,7 @@ export const AppMain: React.FC = () => {
         setShowTextActions(false);
       }
     },
-    [isEnabled]
+    [isEnabled, picking]
   );
 
   // Listen for input changes to update the text value
@@ -185,7 +333,7 @@ export const AppMain: React.FC = () => {
   }, [textareaPopover?.element]);
 
   const handleSelectionAifyClick = useCallback(() => {
-    setShowTextActions(true);
+    setShowTextActions((open) => !open);
   }, []);
 
   // Process text action function with proper dependencies
@@ -224,22 +372,11 @@ export const AppMain: React.FC = () => {
       console.log(`Performing ${action} on text:`, selection.text);
       setShowTextActions(false);
 
-      // Need to create a fixed position element that doesn't disappear when selection is cleared
-      const virtualEl = document.createElement("div");
-      virtualEl.style.position = "absolute";
-
-      if (selection.referenceElement) {
-        const rect = selection.referenceElement.getBoundingClientRect();
-        virtualEl.style.left = `${rect.left + window.scrollX}px`;
-        virtualEl.style.top = `${rect.top + window.scrollY}px`;
-        document.body.appendChild(virtualEl);
-      }
-
       // Set loading state
       setActionResult({
         action,
         text: selection.text,
-        referenceElement: virtualEl,
+        referenceElement: selection.referenceElement,
         loading: true,
       });
 
@@ -283,19 +420,16 @@ export const AppMain: React.FC = () => {
   );
 
   const handleCloseActionResult = useCallback(() => {
-    if (actionResult?.referenceElement) {
-      actionResult.referenceElement.remove();
-    }
     setActionResult(null);
     handleClose();
-  }, [actionResult, handleClose]);
+  }, [handleClose]);
 
   const handleMouseUp = useCallback(
     async (event: MouseEvent) => {
-      if (!isEnabled) return;
+      if (!isEnabled || picking) return;
 
       // Don't process if clicking on Aify menu components
-      if ((event.target as Element)?.closest?.(".aify-menu")) {
+      if (event.composedPath().some((node) => node instanceof Element && node.classList.contains("aify-menu"))) {
         return;
       }
 
@@ -315,7 +449,7 @@ export const AppMain: React.FC = () => {
       const selectedText = window.getSelection()?.toString() || "";
       const wordCount = selectedText.trim().split(/\s+/).length;
 
-      if (wordCount >= minWords) {
+      if (selectedText.trim() && wordCount >= minWords) {
         // Clean up textarea popover only if we're not in an input
         setTextareaPopover(null);
         setShowInputActions(false);
@@ -323,16 +457,12 @@ export const AppMain: React.FC = () => {
         const selection = window.getSelection();
         if (!selection?.rangeCount) return;
 
-        const range = selection.getRangeAt(0);
-        let referenceElement: HTMLElement | null = null;
-        let rect = range.getBoundingClientRect();
-
-        const virtualEl = document.createElement("div");
-        virtualEl.style.position = "absolute";
-        virtualEl.style.left = `${rect.left + window.scrollX}px`;
-        virtualEl.style.top = `${rect.top + window.scrollY}px`;
-        document.body.appendChild(virtualEl);
-        referenceElement = virtualEl;
+        const range = selection.getRangeAt(0).cloneRange();
+        const node = range.commonAncestorContainer;
+        const referenceElement = {
+          contextElement: node instanceof Element ? node : node.parentElement ?? document.body,
+          getBoundingClientRect: () => range.getBoundingClientRect(),
+        };
 
         setSelection({
           text: selectedText,
@@ -340,7 +470,7 @@ export const AppMain: React.FC = () => {
         });
       }
     },
-    [isEnabled, minWords, defaultAction, textareaPopover, showInputActions]
+    [isEnabled, picking, minWords]
   );
 
   const handleKeyDown = useCallback(
@@ -468,21 +598,11 @@ export const AppMain: React.FC = () => {
       console.log(`Performing ${action} on text:`, textareaPopover.text);
       setShowInputActions(false);
 
-      // Create a virtual element for the action result position
-      const virtualEl = document.createElement("div");
-      virtualEl.style.position = "absolute";
-
-      // Position at the bottom of the textarea/input
-      const textareaRect = textareaPopover.element.getBoundingClientRect();
-      virtualEl.style.left = `${textareaRect.left + window.scrollX}px`;
-      virtualEl.style.top = `${textareaRect.bottom + window.scrollY}px`;
-      document.body.appendChild(virtualEl);
-
       // Set loading state
       setActionResult({
         action,
         text: textareaPopover.text,
-        referenceElement: virtualEl,
+        referenceElement: textareaPopover.element,
         loading: true,
       });
 
@@ -528,12 +648,22 @@ export const AppMain: React.FC = () => {
 
   return (
     <>
+      {pickerMode && <PageElementPicker mode={pickerMode} onFinish={finishPicker} onReady={markPickerReady} />}
+      {elementActionButton && !picking && <button ref={actionButtonRef} type="button" className="aify-menu fixed z-[2147483646] rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white shadow-lg hover:bg-blue-700" style={{ left: elementActionButton.x, top: elementActionButton.y }} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); void runElementAction(); }}>{elementActionButton.action.title}</button>}
+      {quickActionError && <div role="alert" className="aify-menu fixed right-3 top-3 z-[2147483646] flex max-w-xs items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-900 shadow-lg">
+        <span>Quick Action failed: {quickActionError}</span>
+        <button type="button" aria-label="Dismiss error" onClick={() => setQuickActionError(undefined)}>×</button>
+      </div>}
+      <div style={picking ? { display: "none" } : { display: "contents" }}>
       <CoreModal
         isOpen={isCoreModalOpen}
         onClose={handleCloseModal}
         context={context || undefined}
         onContextChange={setContext}
         showSettings={showSettings}
+        pickPageAttachment={startPicker}
+        savedAction={quickAction}
+        onSavedActionStart={() => setQuickAction(undefined)}
       />
 
       {/* Action Result Popover */}
@@ -553,14 +683,15 @@ export const AppMain: React.FC = () => {
       {selection && !actionResult && (
         <div
           ref={setSelectionButtonElement}
-          style={selectionStyles.popper}
-          {...selectionAttributes.popper}
+          style={selectionStyle}
           className="z-50 aify-selection-button"
         >
-          <div className="relative flex items-center gap-2 aify-menu">
+          <div className="relative flex select-none items-center gap-2 aify-menu">
             <Button
               size="xs"
               key={"selection-aify"}
+              ref={setSelectionMenuAnchor}
+              aria-expanded={showTextActions}
               variant="default"
               onClick={handleSelectionAifyClick}
               className="hover:bg-blue-100 shadow-xl min-w-[60px]"
@@ -583,6 +714,7 @@ export const AppMain: React.FC = () => {
               actions={(textActionsList ?? "").split("\n")}
               onSelect={handleTextAction}
               show={showTextActions}
+              anchor={selectionMenuAnchor}
             />
           </div>
         </div>
@@ -590,14 +722,15 @@ export const AppMain: React.FC = () => {
       {textareaPopover && !selection && !actionResult && (
         <div
           ref={setPopperElement}
-          style={styles.popper}
-          {...attributes.popper}
+          style={popoverStyle}
           className="z-50 textarea-popover"
         >
-          <div className="relative aify-menu">
+          <div className="relative select-none aify-menu">
             <Button
               size="xs"
               key={"textarea-aify"}
+              ref={setInputMenuAnchor}
+              aria-expanded={showInputActions}
               variant="default"
               onClick={handleAifyButtonClick}
               className="bg-blue-50 hover:bg-blue-100 shadow-xl min-w-[60px]"
@@ -609,10 +742,12 @@ export const AppMain: React.FC = () => {
               actions={(inputActionsList ?? "").split("\n")}
               onSelect={handleInputAction}
               show={showInputActions}
+              anchor={inputMenuAnchor}
             />
           </div>
         </div>
       )}
+      </div>
     </>
   );
 };
