@@ -14,7 +14,6 @@ function randomToken() {
 }
 
 interface AgentSettingsProps {
-  useCustomApi: boolean;
   models: string[];
   isLoadingModels: boolean;
   modelsError: string | null;
@@ -40,7 +39,7 @@ function ToolSwitches({ tools, onChange }: {
   );
 }
 
-export function AgentSettings({ useCustomApi, models, isLoadingModels, modelsError }: AgentSettingsProps) {
+export function AgentSettings({ models, isLoadingModels, modelsError }: AgentSettingsProps) {
   const [profiles, setProfiles, error] = useLocalStorage<AgentProfile[]>(SETTINGS.AGENT_PROFILES, []);
   const [defaultTools, setDefaultTools, defaultToolsError] = useLocalStorage<AgentProfile["tools"]>(SETTINGS.DEFAULT_AGENT_TOOLS, {});
   const [draft, setDraft] = useState<AgentProfile | null>(null);
@@ -94,23 +93,21 @@ export function AgentSettings({ useCustomApi, models, isLoadingModels, modelsErr
             <Textarea label="Soul" required minRows={3} maxRows={8} autosize value={draft.soul}
               placeholder="You are a friendly editor. Offer one concise suggestion at a time."
               onChange={(event) => setDraft({ ...draft, soul: event.currentTarget.value })} />
-            {useCustomApi && (
-              <Select
-                label="Model"
-                description="Auto uses the model selected in General settings."
-                data={modelOptions}
-                value={savedModel ? `model:${savedModel}` : autoModel.value}
-                onChange={(value) => setDraft({
-                  ...draft,
-                  model: value?.startsWith("model:") ? value.slice("model:".length) : undefined,
-                })}
-                allowDeselect={false}
-                searchable
-                rightSection={isLoadingModels ? <Loader size="xs" /> : undefined}
-                error={modelsError}
-                comboboxProps={{ withinPortal: false }}
-              />
-            )}
+            <Select
+              label="Model"
+              description="Auto uses the model selected in General settings."
+              data={modelOptions}
+              value={savedModel ? `model:${savedModel}` : autoModel.value}
+              onChange={(value) => setDraft({
+                ...draft,
+                model: value?.startsWith("model:") ? value.slice("model:".length) : undefined,
+              })}
+              allowDeselect={false}
+              searchable
+              rightSection={isLoadingModels ? <Loader size="xs" /> : undefined}
+              error={modelsError}
+              comboboxProps={{ withinPortal: false }}
+            />
             <div className="flex items-end gap-2">
               <AgentAvatar seed={draft.seed.trim()} size={36} />
               <TextInput className="min-w-0 flex-1" label="Avatar seed" required maxLength={120} value={draft.seed}

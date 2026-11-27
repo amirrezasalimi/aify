@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { isStepCount, jsonSchema, streamText, tool, type ImagePart, type LanguageModel, type ModelMessage } from "ai";
-import { API, SETTINGS } from "../constants";
+import { SETTINGS } from "../constants";
+import { requireApiEndpoint, requireApiModel } from "./api";
 import { agentTools, getAgentSystemPrompt, resolveAgentModel, type AgentProfile } from "./agents";
 import { bindCurrentPage } from "./current-page";
 import { getStorageValue } from "./storage";
@@ -22,28 +23,29 @@ export async function streamAgentReply(options: StreamOptions & {
   onModel: (model: string) => void;
 }) {
   const { agent, signal } = options;
+  const [endpoint, savedKey, defaultModel] = await Promise.all([
+    getStorageValue(SETTINGS.API_ENDPOINT, ""),
+    getStorageValue(SETTINGS.API_KEY, ""),
+    getStorageValue(SETTINGS.SELECTED_MODEL, ""),
+  ]);
+  signal.throwIfAborted();
+  const baseURL = requireApiEndpoint(endpoint).href.replace(/\/+$/, "");
+  const modelId = requireApiModel(resolveAgentModel(agent, defaultModel));
+  const apiKey = savedKey.trim() || undefined;
   // Keep binding errors until the tool is requested, without leaving a rejected promise unhandled.
   const reader = agent.tools?.read_page === true
     ? bindCurrentPage(options.sidebar).catch((error) => async () => { throw error; })
     : undefined;
-  const [custom, baseURL, apiKey, defaultModel] = await Promise.all([
-    getStorageValue(SETTINGS.USE_CUSTOM_API, false),
-    getStorageValue(SETTINGS.API_ENDPOINT, ""),
-    getStorageValue(SETTINGS.API_KEY, ""),
-    getStorageValue(SETTINGS.SELECTED_MODEL, "gpt-3.5-turbo"),
-  ]);
-  signal.throwIfAborted();
-  const modelId = resolveAgentModel(agent, defaultModel, custom);
   const provider = createOpenAICompatible({
-    name: "aify", baseURL: custom ? baseURL.trim() : API, apiKey: custom ? apiKey : "empty",
+    name: "aify", baseURL, apiKey,
     // Pass image URLs to the provider as image inputs rather than downloading them in the extension.
     supportedUrls: () => ({ "image/*": [/^https?:\/\//i] }),
   });
   options.onModel(modelId);
   try {
-    await streamConversation({ ...options, model: provider(modelId), instructions: getAgentSystemPrompt(agent), reader, secret: custom ? apiKey : undefined });
+    await streamConversation({ ...options, model: provider(modelId), instructions: getAgentSystemPrompt(agent), reader, secret: apiKey });
   } catch (error) {
-    throw new Error(errorDetails(error, "Could not complete this reply.", custom ? apiKey : undefined));
+    throw new Error(errorDetails(error, "Could not complete this reply.", apiKey));
   }
 }
 

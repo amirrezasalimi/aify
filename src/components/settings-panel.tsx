@@ -26,6 +26,7 @@ import { AgentSettings } from "./agent-settings";
 import { ElementActionsSettings } from "./element-actions-settings";
 import type { PickPageAttachment } from "../utils/page-attachment";
 import type { AifyTheme } from "./aify-theme-provider";
+import { parseApiEndpoint, testOpenAICompatibleAPI } from "../utils/api";
 
 export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: PickPageAttachment }) => {
   const [theme, setTheme] = useLocalStorage<AifyTheme>(SETTINGS.THEME, "auto");
@@ -44,18 +45,14 @@ export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: Pick
     null
   );
   const [minWords, setMinWords] = useLocalStorage(SETTINGS.MIN_WORDS, 2);
-  const [useCustomApi, setUseCustomApi] = useLocalStorage(
-    SETTINGS.USE_CUSTOM_API,
-    false
-  );
   const [apiKey, setApiKey] = useLocalStorage(SETTINGS.API_KEY, "");
   const [apiEndpoint, setApiEndpoint] = useLocalStorage(
     SETTINGS.API_ENDPOINT,
-    "https://api.openai.com/v1"
+    ""
   );
   const [selectedModel, setSelectedModel] = useLocalStorage(
     SETTINGS.SELECTED_MODEL,
-    "gpt-3.5-turbo"
+    ""
   );
   const [selectedLanguages, setSelectedLanguages] = useLocalStorage(
     SETTINGS.TRANSLATION_LANGUAGES,
@@ -71,7 +68,9 @@ export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: Pick
     models,
     isLoading: isLoadingModels,
     error: modelsError,
-  } = useModels(useCustomApi, apiEndpoint, apiKey);
+  } = useModels(apiEndpoint, apiKey);
+  const validEndpoint = !!parseApiEndpoint(apiEndpoint);
+  const modelOptions = selectedModel && !models.includes(selectedModel) ? [selectedModel, ...models] : models;
 
   const actionOptions = [
     { value: "", label: "None" },
@@ -130,6 +129,46 @@ export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: Pick
         checked={isEnabled}
         onChange={(event) => setIsEnabled(event.currentTarget.checked)}
       />
+
+      <Stack gap="xs">
+        <Alert color="blue" variant="light" icon={<IconInfoCircle />}>
+          Aify has no built-in AI service. Set up your own OpenAI-compatible endpoint and choose a model to use chat and AI actions.
+        </Alert>
+        <TextInput
+          label="API Endpoint"
+          placeholder="https://api.openai.com/v1"
+          value={apiEndpoint}
+          error={apiEndpoint.trim() && !validEndpoint ? "Enter a valid HTTP or HTTPS API base URL." : undefined}
+          onChange={(e) => { setApiEndpoint(e.target.value); setTestStatus(undefined); }}
+        />
+        <TextInput
+          label="API Key"
+          description="Leave blank if your provider doesn’t require a key."
+          type="password"
+          value={apiKey}
+          onChange={(e) => { setApiKey(e.target.value); setTestStatus(undefined); }}
+        />
+        <Select
+          label="Model"
+          description="Default model for chat and text actions."
+          data={modelOptions}
+          value={selectedModel || null}
+          onChange={(value) => setSelectedModel(value || "")}
+          searchable
+          disabled={!validEndpoint}
+          rightSection={isLoadingModels ? <Loader size="xs" /> : null}
+          error={modelsError}
+          comboboxProps={{ withinPortal: false }}
+        />
+        <Button size="xs" onClick={handleTestAPI} disabled={!validEndpoint || isTestingApi} loading={isTestingApi}>
+          {isTestingApi ? "Testing..." : "Test API Connection"}
+        </Button>
+        {testStatus && (
+          <Alert color={testStatus.success ? "green" : "red"} variant="light" icon={<IconInfoCircle />}>
+            {testStatus.message}
+          </Alert>
+        )}
+      </Stack>
 
       <Select
         label="Theme"
@@ -207,66 +246,6 @@ export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: Pick
         />
       </Stack>
 
-      <Stack>
-        <Switch
-          label="Use Custom API"
-          checked={useCustomApi}
-          onChange={(event) => setUseCustomApi(event.currentTarget.checked)}
-        />
-
-        {useCustomApi && (
-          <>
-            <TextInput
-              label="API Endpoint"
-              placeholder="https://api.openai.com/v1"
-              value={apiEndpoint}
-              onChange={(e) => setApiEndpoint(e.target.value)}
-            />
-            <TextInput
-              label="API Key"
-              type="password"
-              placeholder="sk-..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <Select
-              label="Model"
-              description="Select the model to use for transformations"
-              data={models}
-              value={selectedModel}
-              onChange={(value) => setSelectedModel(value || "")}
-              searchable
-              rightSection={isLoadingModels ? <Loader size="xs" /> : null}
-              error={modelsError}
-              comboboxProps={{
-                withinPortal: false,
-              }}
-            />
-            <Button
-              size="xs"
-              onClick={handleTestAPI}
-              disabled={!apiEndpoint || !apiKey || isTestingApi}
-              loading={isTestingApi}
-            >
-              {isTestingApi ? "Testing..." : "Test API Connection"}
-            </Button>
-            {testStatus && (
-              <Alert
-                color={testStatus.success ? "green" : "red"}
-                variant="light"
-                icon={<IconInfoCircle />}
-              >
-                {testStatus.message}
-              </Alert>
-            )}
-            <Alert color="blue" variant="light" icon={<IconInfoCircle />}>
-              Hint: You can use any OpenAI-compatible API like
-              Ollama,OpenRouter, or other LLM providers that implement OpenAI's
-              API format.
-            </Alert>
-          </>
-        )}
-      </Stack>
     </Stack>
   );
 
@@ -285,7 +264,6 @@ export const SettingsPanel = ({ pickPageAttachment }: { pickPageAttachment: Pick
       <Tabs.Panel value="general" pt="sm">{generalSettings}</Tabs.Panel>
       <Tabs.Panel value="agents" pt="sm" pb="md">
         <AgentSettings
-          useCustomApi={useCustomApi}
           models={models}
           isLoadingModels={isLoadingModels}
           modelsError={modelsError}

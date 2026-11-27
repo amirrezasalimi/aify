@@ -4,18 +4,16 @@ import {
   IconSettings,
   IconArrowLeft,
   IconHistory,
-  IconWorld,
 } from "@tabler/icons-react";
 import { useDrag } from "@use-gesture/react";
 import { useViewportSize } from "@mantine/hooks";
-import { Title, Badge } from "@mantine/core";
+import { Title } from "@mantine/core";
 import { Resizable } from "re-resizable";
 import { SettingsPanel } from "./settings-panel";
 import { ChatHistoryPanel } from "./chat-history-panel";
 import type { SavedChat } from "../utils/chat-history";
 import type { ElementActionRequest, PickPageAttachment } from "../utils/page-attachment";
 import ChatPanel from "./chat-panel";
-import { WEBSITE_URL } from "../constants";
 
 // Constants for modal configuration
 const INITIAL_WIDTH = 550;
@@ -246,30 +244,13 @@ export const CoreModal = ({
               ) : showHistory ? (
                 "History"
               ) : (
-                <>
-                  Aify
-                  <a
-                    href={WEBSITE_URL}
-                    className="cursor-pointer"
-                    target="_blank"
-                  >
-                    <Badge size="sm" variant="light" color="cyan">
-                      FREE
-                    </Badge>
-                  </a>
-                </>
+                "Aify"
               )}
             </Title>
           </div>
           <div className="flex items-center gap-2">
             {!showSettings && !showHistory && (
               <>
-                <button
-                  onClick={() => window.open(WEBSITE_URL, "_blank")}
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <IconWorld size={18} />
-                </button>
                 <button
                   onClick={() => setShowHistory(true)}
                   className="text-gray-500 hover:text-gray-700 transition-colors"

@@ -29,6 +29,6 @@ export function getAgentSystemPrompt(agent: AgentProfile, context?: string) {
     : agent.soul;
 }
 
-export function resolveAgentModel(agent: AgentProfile, defaultModel: string, useCustomApi: boolean) {
-  return (useCustomApi && agent.model) || defaultModel || "gpt-3.5-turbo";
+export function resolveAgentModel(agent: AgentProfile, defaultModel: string) {
+  return agent.model?.trim() || defaultModel;
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { parseApiEndpoint } from "../utils/api";
 
 interface UseModelsReturn {
   models: string[];
@@ -8,8 +9,9 @@ interface UseModelsReturn {
 
 const emptyModels: UseModelsReturn = { models: [], isLoading: false, error: null };
 
-export const useModels = (enabled: boolean, endpoint: string, apiKey: string): UseModelsReturn => {
-  const baseURL = endpoint.trim();
+export const useModels = (endpoint: string, key: string): UseModelsReturn => {
+  const baseURL = parseApiEndpoint(endpoint)?.href.replace(/\/+$/, "");
+  const apiKey = key.trim();
   const [result, setResult] = useState<{
     baseURL: string;
     apiKey: string;
@@ -18,13 +20,13 @@ export const useModels = (enabled: boolean, endpoint: string, apiKey: string): U
 
   useEffect(() => {
     setResult(null);
-    if (!enabled || !baseURL) return;
+    if (!baseURL) return;
 
     const controller = new AbortController();
     // Wait for provider settings to settle before requesting the model list.
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch(`${baseURL.replace(/\/+$/, "")}/models`, {
+        const response = await fetch(`${baseURL}/models`, {
           headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
           signal: controller.signal,
         });
@@ -45,9 +47,9 @@ export const useModels = (enabled: boolean, endpoint: string, apiKey: string): U
       clearTimeout(timer);
       controller.abort();
     };
-  }, [enabled, baseURL, apiKey]);
+  }, [baseURL, apiKey]);
 
-  if (!enabled || !baseURL) return emptyModels;
+  if (!baseURL) return emptyModels;
   if (result?.baseURL === baseURL && result.apiKey === apiKey) return result.data;
   return { ...emptyModels, isLoading: true };
 };

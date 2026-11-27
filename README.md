@@ -12,7 +12,7 @@ A minimal and powerful AI assistant that enhances your browsing experience with 
 - ⚡ **Saved Quick Actions** that run a preset instruction with your chosen agent. Hover over a matching area to see what the action will capture.
 - 🛡️ **Block List** with per-site rules, previews, element and keyword markers, and daily counts for the last 30 days plus an all-time total.
 - 🌍 **Selected-text tools** for translation and rewriting, with a one-click default action and a menu that adjusts as you scroll.
-- 🔌 **Custom OpenAI-compatible endpoints** and **Light, Dark, or Auto** themes.
+- 🔌 **Bring your own OpenAI-compatible endpoint** and choose a **Light, Dark, or Auto** theme.
 
 ## Installation
 
@@ -20,13 +20,20 @@ Download and extract the latest build from [GitHub Releases](https://github.com/
 
 ## Using Aify
 
+### Set up your AI provider
+
+Aify no longer provides a default AI endpoint. Chat, rewrite, translation, and AI Quick Actions require your own OpenAI-compatible endpoint. Local per-site blocking doesn’t need one.
+
+1. Open **Settings → General** and enter your provider’s **API Endpoint** (for example, `http://localhost:11434/v1` for a local Ollama server).
+2. Enter an **API Key** if your provider requires one, then select a **Model**. Use **Test API Connection** to check that Aify can reach the provider’s model list.
+
 ### Chrome side panel
 
 Click Aify in Chrome’s toolbar to open the sidebar. If the icon is missing, pin it from the Extensions menu. To chat about selected text, use **Aify → Chat** on the page. Firefox uses the in-page chat.
 
 ### Chat agents
 
-Create agents under **Settings → Agents** and switch between them below the chat box. Set each agent’s **Soul** (instructions), avatar, and optional model override when **Use Custom API** is enabled. **Auto** uses the model selected in General.
+Create agents under **Settings → Agents** and switch between them below the chat box. Set each agent’s **Soul** (instructions), avatar, and optional model override. **Auto** uses the model selected in General.
 
 **Read current page** is an opt-in tool. When a tool-capable model calls it, Aify shares an excerpt, up to three images, and up to 40 visible links with your AI provider. It doesn’t open linked pages. Image analysis requires a vision-capable model.
 

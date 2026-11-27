@@ -6,7 +6,6 @@ export const SETTINGS = {
   INSTANT_MODE: "instantMode",
   DEFAULT_ACTION: "defaultAction",
   MIN_WORDS: "minWords",
-  USE_CUSTOM_API: "useCustomApi",
   API_KEY: "apiKey",
   API_ENDPOINT: "apiEndpoint",
   SELECTED_MODEL: "selectedModel",
@@ -27,6 +26,3 @@ Make Friendly`;
 export const defaultTextActions = `Simplify
 Eli5
 Summarize`;
-
-export const WEBSITE_URL = "https://aify-api.toolstack.run";
-export const API = `${WEBSITE_URL}/api`;
